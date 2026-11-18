@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How the product costing run works</title>
+<style>
+  :root {
+    --navy: #013465;
+    --ink: #1f2a37;
+    --muted: #5b6675;
+    --line: #c9d0da;
+    --mfg: linear-gradient(135deg, #F8433E 0%, #926F97 100%);
+    --fin: linear-gradient(135deg, #AFD867 0%, #AD9F41 100%);
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: #fff; }
+  body {
+    font-family: "Segoe UI", system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif;
+    color: var(--ink);
+    line-height: 1.45;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 32px 24px 48px; }
+  h1 { color: var(--navy); font-size: clamp(1.6rem, 3vw, 2.3rem); margin: 0 0 6px; letter-spacing: -0.01em; }
+  .hint { color: var(--muted); margin: 0 0 28px; font-size: 0.98rem; }
+
+  /* Flow */
+  .flow { display: flex; align-items: stretch; gap: 0; }
+  .block {
+    flex: 1 1 0; min-width: 0;
+    border: 0; border-radius: var(--radius);
+    padding: 18px 12px; min-height: 132px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+    font: inherit; font-weight: 700; font-size: 1.02rem; line-height: 1.2;
+    cursor: pointer; position: relative;
+    box-shadow: 0 2px 6px rgba(1, 52, 101, 0.10);
+    transition: transform .18s ease, box-shadow .18s ease, opacity .18s ease;
+  }
+  .block small { display: block; font-weight: 600; font-size: 0.82rem; margin-top: 6px; opacity: .95; }
+  .block .num {
+    position: absolute; top: 8px; left: 10px;
+    font-size: 0.72rem; font-weight: 700; opacity: .8;
+  }
+  .block.mfg { background: var(--mfg); color: #fff; }
+  .block.fin { background: var(--fin); color: var(--navy); }
+  .block:hover { transform: translateY(-2px); box-shadow: 0 6px 14px rgba(1, 52, 101, 0.16); }
+  .block:focus-visible { outline: 3px solid var(--navy); outline-offset: 3px; }
+  .flow.has-active .block:not(.active) { opacity: .72; }
+  .block.active {
+    opacity: 1; transform: translateY(-4px);
+    box-shadow: 0 0 0 3px #fff, 0 0 0 6px var(--navy), 0 10px 22px rgba(1, 52, 101, 0.22);
+  }
+  .block.active::after {
+    content: ""; position: absolute; left: 50%; bottom: -17px; transform: translateX(-50%);
+    border: 9px solid transparent; border-top-color: var(--navy);
+  }
+
+  .group { flex: 3.3 1 0; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+  .banner {
+    background: var(--fin); color: var(--navy);
+    border-radius: var(--radius); text-align: center;
+    font-weight: 800; letter-spacing: .12em; font-size: 0.9rem; padding: 9px 8px;
+  }
+  .group-row { display: flex; flex: 1; align-items: stretch; }
+  .group-row .block { min-height: 110px; }
+
+  .arrow {
+    flex: 0 0 40px; display: flex; align-items: center; justify-content: center; position: relative;
+    color: var(--navy);
+  }
+  .group-row .arrow { flex-basis: 28px; }
+  .arrow svg { width: 30px; max-width: 90%; height: 14px; display: block; }
+  .arrow.sold { flex-basis: 66px; flex-direction: column; }
+  .arrow.sold em {
+    font-style: italic; font-weight: 800; font-size: 0.78rem; letter-spacing: .06em;
+    color: var(--navy); margin-bottom: 4px;
+  }
+  .flow > .block, .flow > .arrow { margin-top: 49px; }
+  .flow > .block { min-height: 110px; }
+
+  /* Panel */
+  .panel {
+    margin-top: 30px; border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 22px 24px 20px; background: #fff; position: relative; overflow: hidden;
+  }
+  .panel::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 6px; background: var(--accent, var(--mfg)); }
+  .step { color: var(--muted); font-size: 0.82rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; margin: 0 0 4px; }
+  .panel h2 { color: var(--navy); margin: 0 0 8px; font-size: 1.35rem; }
+  .explain { margin: 0 0 16px; font-size: 1.04rem; max-width: 70ch; }
+  .groups { display: flex; flex-wrap: wrap; gap: 14px 32px; }
+  .g h3 { font-size: 0.86rem; color: var(--navy); margin: 0 0 8px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
+  .chips li {
+    border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px;
+    font-size: 0.9rem; background: #f7f9fb;
+  }
+  .lines { margin: 0; padding-left: 18px; }
+  .lines li { margin: 0 0 4px; }
+  .nav { display: flex; justify-content: space-between; align-items: center; margin-top: 20px; gap: 12px; }
+  .nav button {
+    font: inherit; font-weight: 600; font-size: 0.92rem; color: var(--navy);
+    background: #fff; border: 1.5px solid var(--navy); border-radius: 999px; padding: 7px 16px; cursor: pointer;
+  }
+  .nav button:hover:not(:disabled) { background: var(--navy); color: #fff; }
+  .nav button:disabled { opacity: .35; cursor: default; }
+  .nav button:focus-visible { outline: 3px solid var(--navy); outline-offset: 2px; }
+  .dots { display: flex; gap: 6px; }
+  .dots span { width: 8px; height: 8px; border-radius: 50%; background: var(--line); }
+  .dots span.on { background: var(--navy); }
+
+  /* Narrow screens: vertical flow */
+  @media (max-width: 860px) {
+    .flow, .group-row { flex-direction: column; }
+    .block, .group-row .block { min-height: 74px; flex: none; }
+    .group { flex: none; }
+    .flow > .block, .flow > .arrow { margin-top: 0; }
+    .arrow, .group-row .arrow, .arrow.sold { flex: none; height: 34px; }
+    .arrow svg { width: 26px; height: 14px; transform: rotate(90deg); }
+    .arrow.sold { flex-direction: row; gap: 8px; height: 40px; }
+    .arrow.sold em { margin: 0; }
+    
+    .block.active::after { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) { .block { transition: none; } }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <h1>How the product costing run works</h1>
+  <p class="hint">Click a block to see what happens at each step.</p>
+
+  <div class="flow" id="flow" role="group" aria-label="Product costing run, 6 steps">
+    <button class="block mfg" data-i="0"><span class="num">1</span>COGM<small>Cost of Goods Manufactured</small></button>
+    <span class="arrow" aria-hidden="true"></span>
+    <div class="group">
+      <div class="banner">PRODUCT COSTING</div>
+      <div class="group-row">
+        <button class="block fin" data-i="1"><span class="num">2</span>Allocation to Production Lines</button>
+        <span class="arrow" aria-hidden="true"></span>
+        <button class="block fin" data-i="2"><span class="num">3</span>Assign to Process Order</button>
+        <span class="arrow" aria-hidden="true"></span>
+        <button class="block fin" data-i="3"><span class="num">4</span>Transfer to Inventory</button>
+      </div>
+    </div>
+    <span class="arrow" aria-hidden="true"></span>
+    <button class="block mfg" data-i="4"><span class="num">5</span>Balance Sheet</button>
+    <span class="arrow sold" aria-hidden="true"><em>SOLD</em></span>
+    <button class="block mfg" data-i="5"><span class="num">6</span>COGS<small>Costs of Goods Sold</small></button>
+  </div>
+
+  <section class="panel" id="panel" aria-live="polite">
+    <p class="step" id="step"></p>
+    <h2 id="ptitle"></h2>
+    <p class="explain" id="pexplain"></p>
+    <div class="groups" id="pgroups"></div>
+    <div class="nav">
+      <button id="prev" type="button">&larr; Previous</button>
+      <div class="dots" id="dots" aria-hidden="true"></div>
+      <button id="next" type="button">Next &rarr;</button>
+    </div>
+  </section>
+</main>
+
+<script>
+  var STEPS = [
+    {
+      title: "COGM – Cost of Goods Manufactured",
+      kind: "mfg",
+      explain: "Production costs are first collected on cost centers and on GL accounts.",
+      groups: [
+        { h: "On Cost Centers", chips: ["Maintenance", "Safety", "QA", "…"] },
+        { h: "On GL Accounts", chips: ["Salaries", "Rent", "Purchase", "…"] }
+      ]
+    },
+    {
+      title: "Allocation to Production Lines",
+      kind: "fin",
+      explain: "The costs are allocated to the production lines, called resource cost centers.",
+      groups: [
+        { h: "On Resource Cost Centers", chips: ["Distillation L1", "Bottling L1", "Bottling L2", "…"] }
+      ]
+    },
+    {
+      title: "Assign to Process Order",
+      kind: "fin",
+      explain: "Each process order receives its costs through activities, plus the ingredients consumed.",
+      groups: [
+        { h: "Through Activities", chips: ["Machine hours", "Labor hours", "…"] },
+        { h: "Plus", chips: ["Ingredient consumption"] }
+      ]
+    },
+    {
+      title: "Transfer to Inventory",
+      kind: "fin",
+      explain: "The costs on the process order are transferred to inventory, which sits on the balance sheet.",
+      groups: []
+    },
+    {
+      title: "Balance Sheet",
+      kind: "mfg",
+      explain: "Inventory is held on the balance sheet, on valuation classes. When the goods are sold, their cost moves to COGS.",
+      groups: [
+        { h: "On Valuation Classes", chips: ["Aged", "Non-aged Liquid", "Semi Finished", "Finished Goods", "…"] }
+      ]
+    },
+    {
+      title: "COGS – Costs of Goods Sold",
+      kind: "mfg",
+      explain: "Once the goods are sold, their cost is shown in COGS, on the cost component structure.",
+      groups: [
+        { h: "On Cost Component Structure", lines: [
+          "<strong>Wet:</strong> Direct Labor, Depreciation &amp; Rent Indirect costs, Overheads…",
+          "<strong>Production:</strong> Direct Labor, Depreciation &amp; Rent Indirect costs, Overheads…",
+          "Raw Materials, Dry Materials, Liquid Product…"
+        ] }
+      ]
+    }
+  ];
+
+  var flow = document.getElementById("flow");
+  var blocks = Array.prototype.slice.call(flow.querySelectorAll(".block"));
+  var panel = document.getElementById("panel");
+  var dots = document.getElementById("dots");
+  var current = 0;
+
+  STEPS.forEach(function () { dots.appendChild(document.createElement("span")); });
+
+  function esc(s) {
+    return String(s).replace(/[&<>"]/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+    });
+  }
+
+  function show(i, focus) {
+    current = i;
+    var s = STEPS[i];
+    flow.classList.add("has-active");
+    blocks.forEach(function (b, k) {
+      var on = k === i;
+      b.classList.toggle("active", on);
+      b.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+    panel.style.setProperty("--accent", s.kind === "mfg" ? "var(--mfg)" : "var(--fin)");
+    document.getElementById("step").textContent = "Step " + (i + 1) + " of " + STEPS.length;
+    document.getElementById("ptitle").textContent = s.title;
+    document.getElementById("pexplain").textContent = s.explain;
+    document.getElementById("pgroups").innerHTML = s.groups.map(function (g) {
+      var body = g.lines
+        ? '<ul class="lines">' + g.lines.map(function (l) { return "<li>" + l + "</li>"; }).join("") + "</ul>"
+        : '<ul class="chips">' + g.chips.map(function (c) { return "<li>" + esc(c) + "</li>"; }).join("") + "</ul>";
+      return '<div class="g"><h3>' + esc(g.h) + ":</h3>" + body + "</div>";
+    }).join("");
+    Array.prototype.forEach.call(dots.children, function (d, k) { d.classList.toggle("on", k === i); });
+    document.getElementById("prev").disabled = i === 0;
+    document.getElementById("next").disabled = i === STEPS.length - 1;
+    if (focus) blocks[i].focus();
+  }
+
+  blocks.forEach(function (b) {
+    b.addEventListener("click", function () { show(Number(b.dataset.i)); });
+  });
+  flow.addEventListener("keydown", function (e) {
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") { e.preventDefault(); show(Math.min(current + 1, STEPS.length - 1), true); }
+    if (e.key === "ArrowLeft" || e.key === "ArrowUp") { e.preventDefault(); show(Math.max(current - 1, 0), true); }
+  });
+  document.getElementById("prev").addEventListener("click", function () { if (current > 0) show(current - 1); });
+  document.getElementById("next").addEventListener("click", function () { if (current < STEPS.length - 1) show(current + 1); });
+
+  // Arrows
+  var arrowSvg = '<svg viewBox="0 0 40 14" aria-hidden="true">' +
+    '<line x1="2" y1="7" x2="31" y2="7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>' +
+    '<path d="M29 2 L38 7 L29 12 Z" fill="currentColor"/></svg>';
+  Array.prototype.forEach.call(document.querySelectorAll(".arrow"), function (a) {
+    a.insertAdjacentHTML("beforeend", arrowSvg);
+  });
+
+  show(0);
+</script>
+</body>
+</html>
